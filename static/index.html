@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopping Agent</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; height: 100vh; }
+
+        /* Login Screen */
+        .login-screen {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; gap: 24px;
+        }
+        .login-screen h1 { font-size: 2rem; color: #1a1a2e; }
+        .login-screen p { color: #666; font-size: 1.1rem; }
+        .login-buttons { display: flex; gap: 16px; }
+        .login-btn {
+            padding: 20px 40px; font-size: 1.2rem; border: none; border-radius: 12px;
+            cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; font-weight: 600;
+        }
+        .login-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+        .login-btn.marla { background: #e8d5f5; color: #6b21a8; }
+        .login-btn.steve { background: #d5e8f5; color: #1e40af; }
+
+        /* App Layout */
+        .app { display: none; height: 100vh; flex-direction: column; }
+        .app.active { display: flex; }
+
+        /* Header */
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 24px; background: #1a1a2e; color: white;
+        }
+        .header h2 { font-size: 1.1rem; }
+        .header .user-info { display: flex; align-items: center; gap: 12px; }
+        .logout-btn {
+            padding: 6px 16px; background: rgba(255,255,255,0.15); color: white;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+        }
+        .logout-btn:hover { background: rgba(255,255,255,0.25); }
+
+        /* Main Content */
+        .main { display: flex; flex: 1; overflow: hidden; }
+
+        /* Chat Panel */
+        .chat-panel { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #ddd; }
+        .messages {
+            flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px;
+        }
+        .message {
+            max-width: 75%; padding: 12px 16px; border-radius: 16px;
+            line-height: 1.5; font-size: 0.95rem; white-space: pre-wrap;
+        }
+        .message.user {
+            align-self: flex-end; background: #1a1a2e; color: white;
+            border-bottom-right-radius: 4px;
+        }
+        .message.assistant {
+            align-self: flex-start; background: white; color: #333;
+            border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .message.typing {
+            align-self: flex-start; background: white; color: #999; font-style: italic;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .chat-input-area { display: flex; padding: 16px; gap: 8px; background: white; border-top: 1px solid #eee; }
+        .chat-input {
+            flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 24px;
+            font-size: 0.95rem; outline: none;
+        }
+        .chat-input:focus { border-color: #1a1a2e; }
+        .send-btn {
+            padding: 12px 24px; background: #1a1a2e; color: white; border: none;
+            border-radius: 24px; cursor: pointer; font-weight: 600;
+        }
+        .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Recommendations Panel */
+        .reco-panel {
+            width: 380px; display: flex; flex-direction: column; background: #fafafa;
+            overflow-y: auto; padding: 20px;
+        }
+        .reco-btn {
+            padding: 16px; background: linear-gradient(135deg, #6b21a8, #1e40af);
+            color: white; border: none; border-radius: 12px; font-size: 1.1rem;
+            font-weight: 700; cursor: pointer; margin-bottom: 20px;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .reco-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
+        .reco-btn:disabled { opacity: 0.6; cursor: wait; }
+        .reco-message { font-size: 0.9rem; color: #666; margin-bottom: 16px; font-style: italic; }
+        .section-label {
+            font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 8px; padding: 0 4px;
+        }
+        .section-label.best { color: #16a34a; }
+        .section-label.other { color: #666; margin-top: 16px; }
+        .product-card {
+            background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08); transition: transform 0.15s;
+        }
+        .product-card.best-match {
+            border: 2px solid #16a34a; box-shadow: 0 2px 12px rgba(22,163,74,0.15);
+        }
+        .best-badge {
+            display: inline-block; background: #16a34a; color: white; font-size: 0.7rem;
+            font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .product-card:hover { transform: translateY(-2px); }
+        .product-icon { font-size: 2rem; margin-bottom: 8px; }
+        .product-name { font-weight: 600; color: #1a1a2e; margin-bottom: 4px; }
+        .product-tags { font-size: 0.8rem; color: #888; margin-bottom: 8px; }
+        .product-price { font-weight: 700; color: #16a34a; font-size: 1.1rem; }
+
+        .welcome { text-align: center; color: #999; margin-top: 40px; font-size: 0.95rem; }
+
+        /* Products Nav Link */
+        .nav-link {
+            padding: 6px 16px; background: none; color: rgba(255,255,255,0.8);
+            border: 1px solid rgba(255,255,255,0.3); border-radius: 6px;
+            cursor: pointer; font-size: 0.85rem; transition: all 0.15s;
+        }
+        .nav-link:hover { background: rgba(255,255,255,0.15); color: white; }
+        .login-nav { position: absolute; top: 20px; right: 24px; }
+        .login-nav .nav-link {
+            color: #1a1a2e; border-color: #1a1a2e;
+        }
+        .login-nav .nav-link:hover { background: #1a1a2e; color: white; }
+
+        /* Products Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            z-index: 100; align-items: center; justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white; border-radius: 16px; width: 700px; max-height: 85vh;
+            display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 20px 24px; border-bottom: 1px solid #eee;
+        }
+        .modal-header h2 { font-size: 1.3rem; color: #1a1a2e; }
+        .modal-close {
+            background: none; border: none; font-size: 1.5rem; cursor: pointer;
+            color: #999; padding: 4px 8px; border-radius: 6px;
+        }
+        .modal-close:hover { background: #f0f0f0; color: #333; }
+        .modal-body {
+            padding: 20px 24px; overflow-y: auto; display: grid;
+            grid-template-columns: 1fr 1fr; gap: 12px;
+        }
+        .modal-body .product-card { margin-bottom: 0; }
+    </style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div class="login-screen" id="loginScreen">
+    <div class="login-nav">
+        <button class="nav-link" onclick="showProducts()">📦 Products</button>
+    </div>
+    <h1>🛍️ Shopping Agent</h1>
+    <p>Log in to chat with your personal shopping assistant</p>
+    <div class="login-buttons">
+        <button class="login-btn marla" onclick="login('marla')">👩 Log in as Marla</button>
+        <button class="login-btn steve" onclick="login('steve')">👨 Log in as Steve</button>
+    </div>
+</div>
+
+<!-- App -->
+<div class="app" id="app">
+    <div class="header">
+        <h2>🛍️ Shopping Agent</h2>
+        <div class="user-info">
+            <button class="nav-link" onclick="showProducts()">📦 Products</button>
+            <span id="userName"></span>
+            <button class="logout-btn" onclick="logout()">Log out</button>
+        </div>
+    </div>
+    <div class="main">
+        <div class="chat-panel">
+            <div class="messages" id="messages">
+                <div class="welcome" id="welcome">Start chatting to tell me what you like!</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" class="chat-input" id="chatInput"
+                       placeholder="Tell me what you're into..."
+                       onkeydown="if(event.key==='Enter') sendMessage()">
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+        <div class="reco-panel">
+            <button class="reco-btn" id="recoBtn" onclick="getRecommendations()">
+                ✨ Show me recommendations
+            </button>
+            <div id="recoMessage"></div>
+            <div id="recoProducts"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Products Modal -->
+<div class="modal-overlay" id="productsModal" onclick="if(event.target===this) closeProducts()">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>📦 Our Products</h2>
+            <button class="modal-close" onclick="closeProducts()">✕</button>
+        </div>
+        <div class="modal-body" id="productsGrid"></div>
+    </div>
+</div>
+
+<script>
+    let currentUser = null;
+
+    async function login(username) {
+        const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+        });
+        const data = await res.json();
+
+        currentUser = data.user;
+        document.getElementById('userName').textContent = `Hi, ${data.user.display_name}!`;
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').classList.add('active');
+
+        // Load existing chat history
+        const messagesEl = document.getElementById('messages');
+        messagesEl.innerHTML = '';
+        if (data.history && data.history.length > 0) {
+            data.history.forEach(m => addMessage(m.role, m.content));
+        } else {
+            messagesEl.innerHTML = '<div class="welcome">Start chatting to tell me what you like!</div>';
+        }
+
+        // Clear recommendations
+        document.getElementById('recoMessage').textContent = '';
+        document.getElementById('recoProducts').innerHTML = '';
+    }
+
+    function logout() {
+        currentUser = null;
+        document.getElementById('app').classList.remove('active');
+        document.getElementById('loginScreen').style.display = 'flex';
+    }
+
+    function addMessage(role, content) {
+        const messagesEl = document.getElementById('messages');
+        const welcome = messagesEl.querySelector('.welcome');
+        if (welcome) welcome.remove();
+
+        const div = document.createElement('div');
+        div.className = `message ${role}`;
+        div.textContent = content;
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return div;
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('chatInput');
+        const message = input.value.trim();
+        if (!message || !currentUser) return;
+
+        input.value = '';
+        addMessage('user', message);
+
+        const sendBtn = document.getElementById('sendBtn');
+        sendBtn.disabled = true;
+        const typing = addMessage('typing', 'Thinking...');
+
+        try {
+            const res = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser.username, message })
+            });
+            const data = await res.json();
+            typing.remove();
+            addMessage('assistant', data.response);
+        } catch (err) {
+            typing.remove();
+            addMessage('assistant', 'Sorry, something went wrong. Please try again.');
+        }
+
+        sendBtn.disabled = false;
+        input.focus();
+    }
+
+    async function getRecommendations() {
+        if (!currentUser) return;
+
+        const btn = document.getElementById('recoBtn');
+        btn.disabled = true;
+        btn.textContent = '⏳ Finding your picks...';
+
+        try {
+            const res = await fetch('/api/recommendations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser.username })
+            });
+            const data = await res.json();
+
+            document.getElementById('recoMessage').textContent = data.message;
+            const container = document.getElementById('recoProducts');
+            container.innerHTML = '';
+
+            function productCard(p, isBest) {
+                return `
+                    <div class="product-card ${isBest ? 'best-match' : ''}">
+                        ${isBest ? '<div class="best-badge">⭐ Best Match</div>' : ''}
+                        <div class="product-icon">${p.image}</div>
+                        <div class="product-name">${p.name}</div>
+                        <div class="product-tags">${p.tags.join(' · ')}</div>
+                        <div class="product-price">$${p.price.toFixed(2)}</div>
+                    </div>
+                `;
+            }
+
+            if (data.best_match) {
+                container.innerHTML += '<div class="section-label best">🎯 Top Pick For You</div>';
+                container.innerHTML += productCard(data.best_match, true);
+            }
+
+            if (data.other && data.other.length > 0) {
+                container.innerHTML += '<div class="section-label other">You might also like</div>';
+                data.other.forEach(p => {
+                    container.innerHTML += productCard(p, false);
+                });
+            }
+        } catch (err) {
+            document.getElementById('recoMessage').textContent = 'Failed to load recommendations.';
+        }
+
+        btn.disabled = false;
+        btn.textContent = '✨ Show me recommendations';
+    }
+    async function showProducts() {
+        const modal = document.getElementById('productsModal');
+        const grid = document.getElementById('productsGrid');
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#999">Loading...</div>';
+        modal.classList.add('active');
+
+        try {
+            const res = await fetch('/api/products');
+            const data = await res.json();
+            grid.innerHTML = '';
+            data.products.forEach(p => {
+                grid.innerHTML += `
+                    <div class="product-card">
+                        <div class="product-icon">${p.image}</div>
+                        <div class="product-name">${p.name}</div>
+                        <div class="product-tags">${p.tags.join(' · ')}</div>
+                        <div class="product-price">$${p.price.toFixed(2)}</div>
+                    </div>
+                `;
+            });
+        } catch (err) {
+            grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#c00">Failed to load products.</div>';
+        }
+    }
+
+    function closeProducts() {
+        document.getElementById('productsModal').classList.remove('active');
+    }
+</script>
+</body>
+</html>
