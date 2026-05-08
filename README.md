@@ -2,6 +2,8 @@
 
 A personalized shopping assistant web app powered by [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/) and local LLMs via [Ollama](https://ollama.com).
 
+## 🎬 Demo
+
 <p align="center">
   <img src="./assets/demo.gif" alt="Commerce Agent Demo" />
 </p>
