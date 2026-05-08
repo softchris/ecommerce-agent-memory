@@ -4,9 +4,7 @@ A personalized shopping assistant web app powered by [Microsoft Agent Framework]
 
 ## 🎬 Demo
 
-<p align="center">
-  <img src="./assets/demo.gif" alt="Commerce Agent Demo" />
-</p>
+![Commerce Agent Demo](./assets/demo.gif)
 
 Log in as **Marla** or **Steve**, chat with your AI shopping assistant about your preferences, and get personalized product recommendations — all backed by persistent SQL Server conversation history.
 
