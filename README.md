@@ -2,6 +2,8 @@
 
 A personalized shopping assistant web app powered by [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/) and local LLMs via [Ollama](https://ollama.com).
 
+![Commerce Agent Demo](assets/ecommerce-sqlserver.gif)
+
 Log in as **Marla** or **Steve**, chat with your AI shopping assistant about your preferences, and get personalized product recommendations — all backed by persistent SQL Server conversation history.
 
 ![Background](./assets/background.png)
