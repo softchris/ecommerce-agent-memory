@@ -196,9 +196,9 @@
         <h2>🛍️ Shopping Agent</h2>
         <div class="provider-switch">
             <label>Recs:</label>
-            <button class="provider-opt active" data-provider="keymatch" onclick="setProvider('keymatch')">KeyMatch</button>
+            <button class="provider-opt" data-provider="keymatch" onclick="setProvider('keymatch')">KeyMatch</button>
             <button class="provider-opt" data-provider="ollama" onclick="setProvider('ollama')">Ollama</button>
-            <button class="provider-opt" data-provider="foundry" onclick="setProvider('foundry')">Foundry</button>
+            <button class="provider-opt active" data-provider="foundry" onclick="setProvider('foundry')">Foundry</button>
         </div>
         <div class="user-info">
             <button class="nav-link" onclick="showProducts()">📦 Products</button>
@@ -241,7 +241,7 @@
 
 <script>
     let currentUser = null;
-    let currentProvider = 'keymatch';
+    let currentProvider = 'foundry';
 
     function setProvider(provider) {
         currentProvider = provider;

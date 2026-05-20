@@ -1,20 +1,26 @@
 # 🛍️ Commerce Agent
 
-A personalized shopping assistant web app powered by [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/) and local LLMs via [Ollama](https://ollama.com).
+A personalized shopping assistant web app powered by [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/) with [Foundry Local](https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-local/get-started) as the default LLM provider (and optional Ollama support).
 
 ## 🎬 Demo
 
-![Commerce Agent Demo](https://raw.githubusercontent.com/softchris/ecommerce-agent-memory/master/assets/demo.gif)
+![Commerce Agent Demo](./assets/demo.gif)
 
 Log in as **Marla** or **Steve**, chat with your AI shopping assistant about your preferences, and get personalized product recommendations — all backed by persistent SQL Server conversation history.
+
+### 👀 What you'll get
+
+![Steve chatting with Foundry provider](./assets/steve-foundry.png)
+
+![Marla chatting with Foundry provider](./assets/marla-foundry.png)
 
 ## ✨ Features
 
 - 🔐 **User login** — switch between users, each with their own conversation history
-- 💬 **AI chat** — conversational shopping assistant powered by Llama 3.1
+- 💬 **AI chat** — conversational shopping assistant powered by a local LLM provider
 - 🧠 **Memory** — conversations persist in SQL Server across sessions
 - 🎯 **Smart recommendations** — LLM analyzes your preferences with deterministic fallback
-- ⚡ **Model warmup** — pre-loads Ollama models on startup for fast responses
+- ⚡ **Model warmup** — starts/warms the selected local provider at startup for fast responses
 - 🏗️ **Microsoft Agent Framework** — built on `BaseHistoryProvider` for proper session management
 
 ## 🏗️ Architecture
@@ -32,9 +38,9 @@ graph TB
         HP["💾 CommerceHistoryProvider<br/>BaseHistoryProvider"]
     end
 
-    subgraph AI["🧠 Ollama"]
-        L3["🦙 Llama 3.1<br/>Chat"]
-        PHI["⚡ Phi-3 Mini<br/>Recommendations"]
+    subgraph AI["🧠 Local LLM Providers"]
+        FL["🧩 Foundry Local<br/>Default"]
+        OL["🦙 Ollama<br/>Optional"]
     end
 
     subgraph Data["🗄️ SQL Server (Docker)"]
@@ -47,8 +53,10 @@ graph TB
     API --> CA
     API --> RA
     CA --> HP
-    CA -->|"OpenAI API"| L3
-    RA -->|"OpenAI API"| PHI
+    CA -->|"OpenAI API"| FL
+    CA -. "OpenAI API (optional)" .-> OL
+    RA -->|"OpenAI API"| FL
+    RA -. "OpenAI API (optional)" .-> OL
     HP -->|"mssql_python"| HDB
     API -->|"login/session"| UDB
     API -->|"session mgmt"| SDB
@@ -63,7 +71,28 @@ graph TB
 | 🐍 **Python** | 3.12+ | Runtime |
 | 📦 **uv** | 0.8+ | Package manager |
 | 🐳 **Docker** | Latest | SQL Server container |
-| 🦙 **Ollama** | Latest | Local LLM inference |
+| 🧩 **Foundry Local** | Latest | Default local LLM provider |
+| 🦙 **Ollama** | Latest | Optional local LLM provider |
+
+### Install local LLM runtimes
+
+Before running setup, install the local runtime(s) you want to use. Foundry Local is the default in this project, and Ollama is available as an optional provider.
+
+1. **Install Foundry Local (default)**
+
+Use the official Microsoft quickstart to install and validate Foundry Local:
+https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-local/get-started
+
+2. **Install Ollama (optional)**
+
+Download and install Ollama from:
+https://ollama.com/download
+
+Then verify it is available:
+
+```powershell
+ollama --version
+```
 
 ## 🚀 Setup
 
@@ -71,14 +100,12 @@ In the setup steps below we cover:
 
 - Pulling the SQL Server Docker image.
 - Starting the SQL Server container.
-- Pulling the necessary Ollama models.
+- Running with Foundry Local (default) or Ollama (optional).
 
 ### 0. Pull the SQL Server Docker image
 
 Pulls down the SQL Server 2022 image from Microsoft's container registry, i.e ready to run locally.
 
-```bash
-
 ```powershell
 docker run -d `
   --name sql `
@@ -89,23 +116,40 @@ docker run -d `
   mcr.microsoft.com/mssql/server:2022-latest
 ```
 
-### 1. Start SQL Server
+### 1. Connect to SQL Server with sqlcmd
 
-Starts a container so you can speak to the database.
+Opens a SQL shell inside the running container so you can initialize or inspect the database.
 
 ```powershell
-docker run -d `
-  --name sql `
-  -e "ACCEPT_EULA=Y" `
-  -e "MSSQL_SA_PASSWORD=YourStrong!Passw0rd" `
-  -p 1433:1433 `
-  -v sqlvolume:/var/opt/mssql `
-  mcr.microsoft.com/mssql/server:2022-latest
+docker exec -it sql /opt/mssql-tools18/bin/sqlcmd `
+    -S localhost -U sa -P "YourStrong!Passw0rd" -C
 ```
 
-### 2. Pull Ollama models
+### 2. Download models
 
-```bash
+Choose the provider you want to use and download (or pre-load) models.
+
+**Foundry Local (default)**
+
+Download your model explicitly:
+
+```powershell
+foundry download qwen2.5-0.5b
+```
+
+Then run the app with that model selected:
+
+```powershell
+$env:LLM_PROVIDER="foundry"
+$env:FOUNDRY_LOCAL_MODEL="qwen2.5-0.5b"
+uv run uvicorn app:app --reload --port 8000
+```
+
+**Ollama (optional)**
+
+Pull the models explicitly with `ollama pull`:
+
+```powershell
 ollama pull llama3.1
 ollama pull phi3:mini
 ```
@@ -128,12 +172,55 @@ You'll see the models warming up:
 
 ```text
 Database initialized ✅
-Warming up llama3.1:latest...
-  llama3.1:latest ready ✅
-Warming up phi3:mini...
-  phi3:mini ready ✅
+Starting selected LLM provider...
+Provider ready ✅
 Application startup complete.
 ```
+
+## 🧠 Provider Modes (Ollama vs Foundry)
+
+The app supports two LLM providers: `ollama` and `foundry`.
+
+Important behavior:
+
+- **Chat provider is app-level** and is controlled by `LLM_PROVIDER` at startup.
+- **Recommendation provider is request-level** and is selected in the UI (`KeyMatch`, `Ollama`, `Foundry`).
+- **KeyMatch** is deterministic and does not call an LLM.
+
+### Use Foundry for chat (default)
+
+```powershell
+# Optional because Foundry is the default when LLM_PROVIDER is not set
+$env:LLM_PROVIDER="foundry"
+# Optional: point to an existing Foundry Local OpenAI-compatible endpoint
+# $env:FOUNDRY_LOCAL_BASE_URL="http://localhost:5273/v1"
+# Optional model override (default: qwen2.5-0.5b)
+# $env:FOUNDRY_LOCAL_MODEL="qwen2.5-0.5b"
+uv run uvicorn app:app --reload --port 8000
+```
+
+When `FOUNDRY_LOCAL_BASE_URL` is not set, the app uses Foundry Local SDK to start a local service automatically.
+
+If `LLM_PROVIDER` is not set, the app defaults to `foundry`.
+
+### Use Ollama for chat
+
+```powershell
+$env:LLM_PROVIDER="ollama"
+$env:OLLAMA_BASE_URL="http://localhost:11434/v1"
+$env:OLLAMA_MODEL="llama3.1:latest"
+uv run uvicorn app:app --reload --port 8000
+```
+
+### Switching recommendation provider in the UI
+
+In the app header, use **Recs** to switch between:
+
+- **KeyMatch**: keyword scoring only (no LLM call)
+- **Ollama**: LLM-based ranking via Ollama
+- **Foundry**: LLM-based ranking via Foundry
+
+If an LLM recommendation call fails, the backend falls back to KeyMatch automatically.
 
 ### 5. Open the app
 
@@ -161,8 +248,8 @@ commerce-agent/
 
 | Decision | Why |
 |---|---|
-| **Llama 3.1 for chat** | Best conversational quality among local models |
-| **Phi-3 Mini for recommendations** | 2x faster, sufficient for structured JSON output |
+| **Foundry Local as default provider** | Works out of the box with the project's default runtime settings |
+| **Ollama as optional provider** | Easy alternative when you want to run specific local models directly |
 | **LLM + deterministic fallback** | LLM picks products first; keyword scorer catches failures |
 | **Model warmup on startup** | Prevents cold-start latency on first request |
 | **`BaseHistoryProvider`** | Plugs into Agent Framework's session lifecycle properly |

@@ -52,7 +52,7 @@ class ChatRequest(BaseModel):
 
 class RecommendationRequest(BaseModel):
     username: str
-    provider: str = "keymatch"  # "keymatch", "ollama", or "foundry"
+    provider: str = "foundry"  # "keymatch", "ollama", or "foundry"
 
 
 @app.post("/api/login")
