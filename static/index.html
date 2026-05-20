@@ -41,6 +41,24 @@
         }
         .logout-btn:hover { background: rgba(255,255,255,0.25); }
 
+        /* Provider Switch */
+        .provider-switch {
+            display: flex; align-items: center; gap: 6px;
+            background: rgba(255,255,255,0.1); border-radius: 8px; padding: 4px;
+        }
+        .provider-switch label {
+            font-size: 0.75rem; color: rgba(255,255,255,0.6); margin-right: 4px;
+        }
+        .provider-opt {
+            padding: 4px 10px; border: none; border-radius: 6px; font-size: 0.75rem;
+            cursor: pointer; background: transparent; color: rgba(255,255,255,0.7);
+            font-weight: 500; transition: all 0.15s;
+        }
+        .provider-opt:hover { color: white; }
+        .provider-opt.active {
+            background: rgba(255,255,255,0.25); color: white; font-weight: 700;
+        }
+
         /* Main Content */
         .main { display: flex; flex: 1; overflow: hidden; }
 
@@ -176,6 +194,12 @@
 <div class="app" id="app">
     <div class="header">
         <h2>🛍️ Shopping Agent</h2>
+        <div class="provider-switch">
+            <label>Recs:</label>
+            <button class="provider-opt active" data-provider="keymatch" onclick="setProvider('keymatch')">KeyMatch</button>
+            <button class="provider-opt" data-provider="ollama" onclick="setProvider('ollama')">Ollama</button>
+            <button class="provider-opt" data-provider="foundry" onclick="setProvider('foundry')">Foundry</button>
+        </div>
         <div class="user-info">
             <button class="nav-link" onclick="showProducts()">📦 Products</button>
             <span id="userName"></span>
@@ -217,6 +241,14 @@
 
 <script>
     let currentUser = null;
+    let currentProvider = 'keymatch';
+
+    function setProvider(provider) {
+        currentProvider = provider;
+        document.querySelectorAll('.provider-opt').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.provider === provider);
+        });
+    }
 
     async function login(username) {
         const res = await fetch('/api/login', {
@@ -305,7 +337,7 @@
             const res = await fetch('/api/recommendations', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: currentUser.username })
+                body: JSON.stringify({ username: currentUser.username, provider: currentProvider })
             });
             const data = await res.json();
 

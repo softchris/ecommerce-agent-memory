@@ -141,7 +141,7 @@ Navigate to **http://localhost:8000** 🎉
 
 ## 🗂️ Project Structure
 
-```
+```text
 commerce-agent/
 ├── app.py              # FastAPI backend — routes, agents, warmup
 ├── db.py               # Database init, user/session queries, history provider

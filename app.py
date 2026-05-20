@@ -1,49 +1,34 @@
 import asyncio
-import httpx
 from contextlib import asynccontextmanager
+from pathlib import Path
+import sys
+
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from agent_framework import Agent
-from agent_framework.openai import OpenAIChatClient
 
 from db import init_db, get_user, get_or_create_session, get_session_history, CommerceHistoryProvider
 from products import get_all_products, get_product_catalog_text, score_products
 
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-async def warmup_models():
-    """Ping Ollama models to pre-load them into memory."""
-    async with httpx.AsyncClient(timeout=60) as client:
-        try:
-            print("Warming up llama3.1:latest...")
-            await client.post("http://localhost:11434/api/generate", json={
-                "model": "llama3.1:latest",
-                "prompt": "hi",
-                "stream": False,
-                "options": {"num_predict": 1}
-            })
-            print("  llama3.1:latest ready ✅")
-        except Exception as e:
-            print(f"  warmup failed: {e}")
+from llm import create_chat_client, warmup
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    await warmup_models()
+    await warmup()
     yield
 
 app = FastAPI(lifespan=lifespan)
 
 history_provider = CommerceHistoryProvider()
 
-chat_client = OpenAIChatClient(
-    base_url="http://localhost:11434/v1",
-    api_key="not-needed",
-    model_id="llama3.1:latest"
-)
+chat_client = create_chat_client()
 
 agent = Agent(
     client=chat_client,
@@ -67,6 +52,7 @@ class ChatRequest(BaseModel):
 
 class RecommendationRequest(BaseModel):
     username: str
+    provider: str = "keymatch"  # "keymatch", "ollama", or "foundry"
 
 
 @app.post("/api/login")
@@ -109,14 +95,65 @@ async def recommendations(req: RecommendationRequest):
 
     if not history:
         all_prods = get_all_products()[:6]
-        return {"best_match": all_prods[0], "other": all_prods[1:], "message": "No conversation history yet — here are some popular items!"}
+        return {"best_match": all_prods[0], "other": all_prods[1:], "message": "No conversation history yet — here are some popular items!", "provider": req.provider}
 
-    matched = score_products(history)
+    if req.provider == "keymatch":
+        matched = score_products(history)
+    else:
+        # Use LLM (ollama or foundry) for recommendations
+        matched = await _llm_recommendations(history, req.provider)
+
     return {
         "best_match": matched[0] if matched else None,
         "other": matched[1:] if len(matched) > 1 else matched,
-        "message": f"Based on your preferences, {user['display_name']}!"
+        "message": f"Based on your preferences, {user['display_name']}!",
+        "provider": req.provider
     }
+
+
+async def _llm_recommendations(history: list[dict], provider: str) -> list[dict]:
+    """Use an LLM to score and rank products based on chat history."""
+    import os
+    original_provider = os.environ.get("LLM_PROVIDER", "")
+    os.environ["LLM_PROVIDER"] = provider
+
+    try:
+        # Reload the provider module for the selected provider
+        from llm import _load_provider_module, get_provider_name
+        _load_provider_module.cache_clear()
+
+        client = create_chat_client()
+        catalog = get_product_catalog_text()
+        user_msgs = " | ".join(m["content"] for m in history if m["role"] == "user")
+
+        prompt = (
+            f"Based on these user messages:\n{user_msgs}\n\n"
+            f"Rank the best matching products from this catalog (return ONLY the IDs as comma-separated numbers, best first, max 6):\n{catalog}"
+        )
+
+        response = await client.complete(prompt)
+        response_text = str(response)
+
+        # Parse product IDs from response
+        import re
+        ids = [int(x) for x in re.findall(r'\d+', response_text)]
+        all_products = get_all_products()
+        product_map = {p["id"]: p for p in all_products}
+        matched = [product_map[pid] for pid in ids if pid in product_map][:6]
+
+        if matched:
+            return matched
+    except Exception:
+        pass
+    finally:
+        if original_provider:
+            os.environ["LLM_PROVIDER"] = original_provider
+        else:
+            os.environ.pop("LLM_PROVIDER", None)
+        _load_provider_module.cache_clear()
+
+    # Fallback to keymatch if LLM fails
+    return score_products(history)
 
 
 @app.get("/api/products")

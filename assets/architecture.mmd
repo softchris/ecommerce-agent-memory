@@ -1,0 +1,6 @@
+graph LR
+    Browser["🌐 Browser SPA"] --> API["⚙️ FastAPI"]
+    API --> Agent["🤖 Agent (MAF)"]
+    Agent --> LLM["🧠 LLM\nOllama / Foundry"]
+    Agent <--> HP["💾 HistoryProvider"]
+    HP <--> DB["🗄️ SQL Server"]
